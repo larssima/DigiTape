@@ -1,7 +1,8 @@
+const CLIENT_ID = '0476e201675f4bcb926b5bfc6c5d21f1'
 const SCOPES = 'playlist-modify-public playlist-modify-private user-read-private user-read-email'
 
 function getClientId() {
-  return localStorage.getItem('spotify_client_id') || ''
+  return CLIENT_ID
 }
 
 function getRedirectUri() {
@@ -22,8 +23,7 @@ async function generateChallenge(verifier) {
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
 }
 
-export async function login(clientId) {
-  if (clientId) localStorage.setItem('spotify_client_id', clientId)
+export async function login() {
   const verifier = generateVerifier()
   localStorage.setItem('spotify_verifier', verifier)
   const challenge = await generateChallenge(verifier)
