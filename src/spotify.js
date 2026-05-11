@@ -125,6 +125,13 @@ export async function getMe() {
   return apiFetch('https://api.spotify.com/v1/me')
 }
 
+export async function searchTracks(query, limit = 5) {
+  const data = await apiFetch(
+    `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=${limit}`
+  )
+  return data?.tracks?.items ?? []
+}
+
 export async function searchTrack(artist, title) {
   const q = artist ? `track:${title} artist:${artist}` : title
   const data = await apiFetch(

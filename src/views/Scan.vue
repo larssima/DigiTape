@@ -19,13 +19,7 @@
         <div class="upload-label">Scan your mixtape</div>
         <div class="upload-sub">Tap to take a photo or upload an image</div>
       </div>
-      <input
-        ref="fileInput"
-        type="file"
-        accept="image/*"
-        style="display:none"
-        @change="onFile"
-      />
+      <input ref="fileInput" type="file" accept="image/*" style="display:none" @change="onFile" />
 
       <div v-if="!spotifyConnected" class="banner info" style="margin-top: 16px">
         Connect Spotify in Settings to create playlists after scanning.
@@ -36,13 +30,12 @@
     <template v-else-if="step === 'preview'">
       <div class="preview-wrap">
         <img :src="imageUrl" class="preview-img" alt="Mixtape" />
-        <button class="reset-btn" @click="reset" title="Remove">
+        <button class="reset-btn" @click="reset">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
             <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
           </svg>
         </button>
       </div>
-
       <div class="action-pad">
         <button class="btn-primary" :disabled="analyzing" @click="analyze">
           <svg v-if="!analyzing" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
@@ -65,7 +58,7 @@
           <div class="thumb-title">{{ tracks.length }} tracks found</div>
           <div class="thumb-sub">{{ matchedCount }} matched on Spotify</div>
         </div>
-        <button class="reset-btn small" @click="reset" title="Start over">
+        <button class="reset-btn small" @click="reset">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
             <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
           </svg>
@@ -93,6 +86,7 @@
               <span class="track-title-raw">{{ track.title }}</span>
             </div>
 
+            <!-- Searching -->
             <div v-if="track.status === 'searching'" class="track-meta searching">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" class="spin">
                 <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
@@ -100,9 +94,10 @@
               Searching Spotify…
             </div>
 
+            <!-- Found -->
             <div v-else-if="track.status === 'found'" class="track-match">
               <img
-                v-if="track.match.album?.images?.[0]"
+                v-if="track.match.album?.images?.length"
                 :src="track.match.album.images[track.match.album.images.length - 1].url"
                 class="album-art"
                 alt=""
@@ -116,14 +111,70 @@
               </svg>
             </div>
 
-            <div v-else-if="track.status === 'not_found'" class="track-meta not-found">
-              Not found on Spotify
+            <!-- Not found -->
+            <div v-else-if="track.status === 'not_found'" class="not-found-section" @click.stop>
+              <div class="track-meta not-found">Not found on Spotify</div>
+
+              <button
+                v-if="!track.manualSearch"
+                class="manual-search-btn"
+                @click.stop="openManualSearch(i)"
+              >
+                Search manually
+              </button>
+
+              <div v-else class="manual-search-box" @click.stop>
+                <div class="manual-input-wrap">
+                  <input
+                    v-model="track.manualQuery"
+                    type="text"
+                    placeholder="Search Spotify…"
+                    class="manual-input"
+                    :ref="el => { if (el) el.focus() }"
+                    @input="debouncedSearch(i)"
+                    @keydown.escape.stop="track.manualSearch = false"
+                  />
+                  <button class="manual-close" @click.stop="track.manualSearch = false">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                  </button>
+                </div>
+
+                <div v-if="track.manualSearching" class="manual-results-wrap">
+                  <div class="manual-status">Searching…</div>
+                </div>
+
+                <div v-else-if="track.manualResults.length" class="manual-results-wrap">
+                  <div
+                    v-for="result in track.manualResults"
+                    :key="result.id"
+                    class="manual-result"
+                    @click.stop="selectResult(i, result)"
+                  >
+                    <img
+                      v-if="result.album?.images?.length"
+                      :src="result.album.images[result.album.images.length - 1].url"
+                      class="result-art"
+                      alt=""
+                    />
+                    <div class="result-text">
+                      <div class="result-name">{{ result.name }}</div>
+                      <div class="result-artist">{{ result.artists.map(a => a.name).join(', ') }}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div v-else-if="track.manualQuery.length > 1" class="manual-results-wrap">
+                  <div class="manual-status">No results</div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Create playlist section -->
+      <!-- Create playlist -->
       <div class="playlist-section">
         <div class="field">
           <label>Playlist name</label>
@@ -159,8 +210,7 @@
 
         <div v-if="playlistError" class="banner error">{{ playlistError }}</div>
         <div v-if="playlistUrl" class="banner success">
-          Playlist created!
-          <a :href="playlistUrl" target="_blank" rel="noopener">Open in Spotify →</a>
+          Playlist created! <a :href="playlistUrl" target="_blank" rel="noopener">Open in Spotify →</a>
         </div>
       </div>
 
@@ -177,7 +227,8 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { isLoggedIn, searchTrack, createPlaylist } from '../spotify.js'
+import { isLoggedIn, searchTrack, searchTracks, createPlaylist } from '../spotify.js'
+import { saveScan } from '../history.js'
 
 const step = ref('upload')
 const fileInput = ref(null)
@@ -193,6 +244,8 @@ const creating = ref(false)
 const playlistError = ref('')
 const playlistUrl = ref('')
 
+const searchTimers = new Map()
+
 const spotifyConnected = computed(() => isLoggedIn())
 
 const stepLabel = computed(() => {
@@ -201,14 +254,8 @@ const stepLabel = computed(() => {
   return ''
 })
 
-const matchedCount = computed(() =>
-  tracks.value.filter(t => t.status === 'found').length
-)
-
-const notFoundCount = computed(() =>
-  tracks.value.filter(t => t.status === 'not_found').length
-)
-
+const matchedCount = computed(() => tracks.value.filter(t => t.status === 'found').length)
+const notFoundCount = computed(() => tracks.value.filter(t => t.status === 'not_found').length)
 const selectedMatchedCount = computed(() =>
   tracks.value.filter(t => t.included && t.status === 'found').length
 )
@@ -243,8 +290,7 @@ async function compressImage(file) {
         else { width = Math.round(width * maxDim / height); height = maxDim }
       }
       const canvas = document.createElement('canvas')
-      canvas.width = width
-      canvas.height = height
+      canvas.width = width; canvas.height = height
       canvas.getContext('2d').drawImage(img, 0, 0, width, height)
       canvas.toBlob(resolve, 'image/jpeg', 0.88)
     }
@@ -266,13 +312,11 @@ async function analyze() {
   try {
     const compressed = await compressImage(imageBlob.value)
     const b64 = await blobToBase64(compressed)
-
     const resp = await fetch('/api/analyze', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ image: b64, mimeType: 'image/jpeg' })
     })
-
     if (!resp.ok) throw new Error(`Server error ${resp.status}`)
     const { tracks: found, error } = await resp.json()
     if (error) throw new Error(error)
@@ -283,14 +327,17 @@ async function analyze() {
       title: t.title || '',
       status: 'searching',
       match: null,
-      included: true
+      included: true,
+      manualSearch: false,
+      manualQuery: '',
+      manualResults: [],
+      manualSearching: false
     }))
 
     step.value = 'results'
     playlistName.value = 'My Mixtape'
     playlistUrl.value = ''
     playlistError.value = ''
-
     matchTracks()
   } catch (e) {
     analyzeError.value = e.message
@@ -316,16 +363,61 @@ async function matchTracks() {
   searching.value = false
 }
 
+function openManualSearch(i) {
+  const track = tracks.value[i]
+  track.manualSearch = true
+  track.manualQuery = [track.artist, track.title].filter(Boolean).join(' ')
+  if (track.manualQuery) debouncedSearch(i)
+}
+
+function debouncedSearch(i) {
+  clearTimeout(searchTimers.get(i))
+  searchTimers.set(i, setTimeout(() => doManualSearch(i), 380))
+}
+
+async function doManualSearch(i) {
+  const track = tracks.value[i]
+  if (!track.manualQuery.trim()) { track.manualResults = []; return }
+  track.manualSearching = true
+  try {
+    track.manualResults = await searchTracks(track.manualQuery)
+  } catch {
+    track.manualResults = []
+  } finally {
+    track.manualSearching = false
+  }
+}
+
+function selectResult(i, result) {
+  const track = tracks.value[i]
+  track.match = result
+  track.status = 'found'
+  track.included = true
+  track.manualSearch = false
+  track.manualQuery = ''
+  track.manualResults = []
+}
+
 async function doCreatePlaylist() {
   playlistError.value = ''
   playlistUrl.value = ''
   creating.value = true
   try {
-    const uris = tracks.value
-      .filter(t => t.included && t.status === 'found')
-      .map(t => t.match.uri)
-    const playlist = await createPlaylist(playlistName.value || 'My Mixtape', uris)
+    const matched = tracks.value.filter(t => t.included && t.status === 'found')
+    const playlist = await createPlaylist(playlistName.value || 'My Mixtape', matched.map(t => t.match.uri))
     playlistUrl.value = playlist.external_urls?.spotify || ''
+    saveScan({
+      playlistName: playlistName.value || 'My Mixtape',
+      playlistUrl: playlistUrl.value,
+      trackCount: tracks.value.length,
+      matchedCount: matched.length,
+      tracks: matched.map(t => ({
+        artist: t.artist,
+        title: t.title,
+        matchName: t.match.name,
+        matchArtist: t.match.artists.map(a => a.name).join(', ')
+      }))
+    })
   } catch (e) {
     playlistError.value = e.message
   } finally {
@@ -342,11 +434,11 @@ function reset() {
   playlistError.value = ''
   playlistUrl.value = ''
   searching.value = false
+  searchTimers.clear()
 }
 </script>
 
 <style scoped>
-/* Upload zone */
 .upload-zone {
   margin: 24px 16px;
   border: 2px dashed var(--border);
@@ -361,21 +453,16 @@ function reset() {
   -webkit-tap-highlight-color: transparent;
 }
 
-.upload-zone:active,
-.upload-zone.dragging {
+.upload-zone:active, .upload-zone.dragging {
   border-color: var(--accent);
   background: rgba(29, 185, 84, 0.05);
 }
 
 .tape-icon { font-size: 52px; line-height: 1; }
-.upload-label { font-size: 17px; font-weight: 600; color: var(--text); }
+.upload-label { font-size: 17px; font-weight: 600; }
 .upload-sub { font-size: 13px; color: var(--text-sub); text-align: center; line-height: 1.5; }
 
-/* Preview */
-.preview-wrap {
-  position: relative;
-  margin: 16px;
-}
+.preview-wrap { position: relative; margin: 16px; }
 
 .preview-img {
   width: 100%;
@@ -388,28 +475,21 @@ function reset() {
 
 .reset-btn {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: 8px; right: 8px;
   background: rgba(15, 15, 19, 0.8);
   border: 1px solid var(--border);
   color: var(--text);
   border-radius: 50%;
-  width: 30px;
-  height: 30px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  width: 30px; height: 30px;
+  display: flex; align-items: center; justify-content: center;
   cursor: pointer;
   backdrop-filter: blur(6px);
 }
 
 .reset-btn.small { width: 26px; height: 26px; }
 
-.action-pad {
-  padding: 0 16px 16px;
-}
+.action-pad { padding: 0 16px 16px; }
 
-/* Thumbnail row */
 .preview-thumb-wrap {
   display: flex;
   align-items: center;
@@ -419,22 +499,12 @@ function reset() {
   position: relative;
 }
 
-.preview-thumb {
-  width: 56px;
-  height: 56px;
-  object-fit: cover;
-  border-radius: 8px;
-  flex-shrink: 0;
-}
-
+.preview-thumb { width: 56px; height: 56px; object-fit: cover; border-radius: 8px; flex-shrink: 0; }
 .preview-thumb-info { flex: 1; min-width: 0; }
 .thumb-title { font-weight: 600; font-size: 15px; }
 .thumb-sub { font-size: 12px; color: var(--text-sub); margin-top: 2px; }
 
-/* Track list */
-.track-list {
-  padding: 8px 0;
-}
+.track-list { padding: 8px 0; }
 
 .track-item {
   display: flex;
@@ -451,33 +521,25 @@ function reset() {
 .track-item.excluded { opacity: 0.45; }
 
 .checkbox {
-  width: 20px;
-  height: 20px;
+  width: 20px; height: 20px;
   border-radius: 6px;
   border: 1.5px solid var(--border);
   flex-shrink: 0;
   margin-top: 1px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: flex; align-items: center; justify-content: center;
   transition: background 0.15s, border-color 0.15s;
 }
 
-.checkbox.checked {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #000;
-}
+.checkbox.checked { background: var(--accent); border-color: var(--accent); color: #000; }
 
 .track-body { flex: 1; min-width: 0; }
 
 .track-raw {
   font-size: 14px;
-  color: var(--text);
-  line-height: 1.4;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  line-height: 1.4;
 }
 
 .track-artist-raw { font-weight: 600; }
@@ -490,10 +552,8 @@ function reset() {
   gap: 5px;
   font-size: 12px;
   margin-top: 4px;
+  color: var(--text-sub);
 }
-
-.track-meta.searching { color: var(--text-sub); }
-.track-meta.not-found { color: var(--text-sub); }
 
 .track-match {
   display: flex;
@@ -502,32 +562,92 @@ function reset() {
   margin-top: 5px;
 }
 
-.album-art {
-  width: 32px;
-  height: 32px;
-  border-radius: 4px;
-  object-fit: cover;
+.album-art { width: 32px; height: 32px; border-radius: 4px; object-fit: cover; flex-shrink: 0; }
+.match-text { flex: 1; min-width: 0; }
+.match-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.match-artist { font-size: 11px; color: var(--text-sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.found-icon { flex-shrink: 0; }
+
+/* Manual search */
+.not-found-section { margin-top: 4px; }
+
+.manual-search-btn {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 12px;
+  padding: 2px 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.manual-search-box { margin-top: 6px; }
+
+.manual-input-wrap {
+  display: flex;
+  align-items: center;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0 8px 0 10px;
+  gap: 6px;
+}
+
+.manual-input {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-size: 13px;
+  padding: 8px 0;
+}
+
+.manual-input::placeholder { color: var(--text-sub); }
+
+.manual-close {
+  background: none;
+  border: none;
+  color: var(--text-sub);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
   flex-shrink: 0;
 }
 
-.match-text { flex: 1; min-width: 0; }
-.match-name {
-  font-size: 13px;
-  font-weight: 500;
-  white-space: nowrap;
+.manual-results-wrap {
+  margin-top: 4px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
 
-.match-artist {
-  font-size: 11px;
+.manual-status {
+  font-size: 12px;
   color: var(--text-sub);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  padding: 10px 12px;
 }
 
-.found-icon { flex-shrink: 0; }
+.manual-result {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.manual-result:last-child { border-bottom: none; }
+.manual-result:active { background: var(--surface); }
+
+.result-art { width: 36px; height: 36px; border-radius: 4px; object-fit: cover; flex-shrink: 0; }
+.result-text { flex: 1; min-width: 0; }
+.result-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.result-artist { font-size: 11px; color: var(--text-sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* Playlist section */
 .playlist-section {

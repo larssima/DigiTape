@@ -11,6 +11,15 @@
       <span>Scan</span>
     </RouterLink>
 
+    <RouterLink to="/history" class="nav-item" :class="{ active: route.path === '/history' }">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <path d="M12 8v4l3 3"/>
+        <path d="M3.05 11a9 9 0 1 0 .5-3"/>
+        <path d="M3 4v4h4"/>
+      </svg>
+      <span>History</span>
+    </RouterLink>
+
     <RouterLink to="/settings" class="nav-item" :class="{ active: route.path === '/settings' }">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
         <circle cx="12" cy="12" r="3"/>
