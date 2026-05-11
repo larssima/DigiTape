@@ -411,6 +411,7 @@ async function doCreatePlaylist() {
     saveScan({
       playlistName: playlistName.value || 'My Mixtape',
       playlistUrl: playlistUrl.value,
+      playlistId: playlist.id,
       trackCount: tracks.value.length,
       matchedCount: matched.length,
       tracks: matched.map(t => ({

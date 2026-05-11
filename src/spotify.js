@@ -140,10 +140,13 @@ export async function searchTrack(artist, title) {
   return data?.tracks?.items?.[0] ?? null
 }
 
+export async function removePlaylist(playlistId) {
+  await apiFetch(`https://api.spotify.com/v1/playlists/${playlistId}/followers`, { method: 'DELETE' })
+}
+
 export async function createPlaylist(name, trackUris) {
-  const me = await getMe()
   const playlist = await apiFetch(
-    `https://api.spotify.com/v1/users/${me.id}/playlists`,
+    'https://api.spotify.com/v1/me/playlists',
     {
       method: 'POST',
       body: JSON.stringify({ name, description: 'Created by DigiTape 📼', public: false })

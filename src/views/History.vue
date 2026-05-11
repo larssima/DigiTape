@@ -18,7 +18,7 @@
         <div class="scan-main">
           <div class="scan-header">
             <div class="scan-name">{{ scan.playlistName }}</div>
-            <button class="delete-btn" @click="remove(scan.id)" title="Delete">
+            <button class="delete-btn" @click="remove(scan)" title="Delete">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
                 <polyline points="3 6 5 6 21 6"/>
                 <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
@@ -66,6 +66,7 @@
 <script setup>
 import { ref } from 'vue'
 import { getHistory, deleteScan, clearHistory } from '../history.js'
+import { isLoggedIn, removePlaylist } from '../spotify.js'
 
 const scans = ref(getHistory())
 
@@ -73,13 +74,19 @@ function formatDate(iso) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-function remove(id) {
-  deleteScan(id)
+async function remove(scan) {
+  if (scan.playlistId && isLoggedIn()) {
+    const choice = confirm(`"${scan.playlistName}"\n\nAlso delete this playlist from Spotify?`)
+    if (choice) {
+      try { await removePlaylist(scan.playlistId) } catch {}
+    }
+  }
+  deleteScan(scan.id)
   scans.value = getHistory()
 }
 
 function confirmClear() {
-  if (confirm('Clear all scan history?')) {
+  if (confirm('Clear all scan history? Playlists in Spotify will not be affected.')) {
     clearHistory()
     scans.value = []
   }
