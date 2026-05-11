@@ -70,7 +70,7 @@
           v-for="(track, i) in tracks"
           :key="i"
           class="track-item"
-          :class="{ excluded: !track.included }"
+          :class="{ excluded: !track.included && !track.manualSearch }"
           @click="track.included = !track.included"
         >
           <div class="checkbox" :class="{ checked: track.included }">
@@ -168,6 +168,8 @@
                 <div v-else-if="track.manualQuery.length > 1" class="manual-results-wrap">
                   <div class="manual-status">No results</div>
                 </div>
+
+                <button class="manual-cancel" @click.stop="track.manualSearch = false">Cancel</button>
               </div>
             </div>
           </div>
@@ -570,6 +572,18 @@ function reset() {
 
 /* Manual search */
 .not-found-section { margin-top: 4px; }
+
+.manual-cancel {
+  background: none;
+  border: none;
+  color: var(--text-sub);
+  font-size: 13px;
+  padding: 6px 0 2px;
+  cursor: pointer;
+  display: block;
+}
+
+.manual-cancel:hover { color: var(--text); }
 
 .manual-search-btn {
   background: none;
