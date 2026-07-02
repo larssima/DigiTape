@@ -36,6 +36,7 @@
         </div>
 
         <button class="danger-btn" @click="disconnect">Disconnect Spotify</button>
+        <button class="debug-btn" @click="debugExpireSession">Simulate expired session (debug)</button>
       </template>
     </div>
 
@@ -61,7 +62,7 @@ const user = ref(null)
 
 onMounted(async () => {
   if (loggedIn.value) {
-    try { user.value = await getMe() } catch {}
+    try { user.value = await getMe() } catch { loggedIn.value = false }
   }
 })
 
@@ -73,6 +74,18 @@ function disconnect() {
   logout()
   loggedIn.value = false
   user.value = null
+}
+
+// TEMP DEBUG - remove after verifying the reauth flow ahead of Spotify's July 20, 2026 refresh-token expiry change
+async function debugExpireSession() {
+  localStorage.setItem('spotify_refresh_token', 'debug-invalid-token')
+  localStorage.setItem('spotify_expires_at', '0')
+  try {
+    user.value = await getMe()
+  } catch {
+    loggedIn.value = false
+    user.value = null
+  }
 }
 </script>
 
@@ -113,4 +126,17 @@ function disconnect() {
 .user-email { font-size: 12px; color: var(--text-sub); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .connected { color: var(--accent); }
+
+.debug-btn {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  background: none;
+  border: 1px dashed var(--border);
+  color: var(--text-sub);
+  border-radius: var(--radius);
+  padding: 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
 </style>

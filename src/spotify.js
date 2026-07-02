@@ -62,6 +62,8 @@ export async function handleCallback(code) {
   return false
 }
 
+export class SpotifyAuthError extends Error {}
+
 async function refreshAccessToken() {
   const refresh = localStorage.getItem('spotify_refresh_token')
   if (!refresh) return false
@@ -81,13 +83,16 @@ async function refreshAccessToken() {
     if (data.refresh_token) localStorage.setItem('spotify_refresh_token', data.refresh_token)
     return true
   }
+  // e.g. invalid_grant: refresh token expired/revoked - discard it, don't retry with it again
+  logout()
   return false
 }
 
 async function getToken() {
   const expiresAt = Number(localStorage.getItem('spotify_expires_at') || 0)
   if (Date.now() > expiresAt - 60_000) {
-    await refreshAccessToken()
+    const ok = await refreshAccessToken()
+    if (!ok) throw new SpotifyAuthError('Spotify session expired. Please reconnect in Settings.')
   }
   return localStorage.getItem('spotify_access_token')
 }

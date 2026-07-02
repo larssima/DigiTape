@@ -229,7 +229,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { isLoggedIn, searchTrack, searchTracks, createPlaylist } from '../spotify.js'
+import { isLoggedIn, searchTrack, searchTracks, createPlaylist, SpotifyAuthError } from '../spotify.js'
 import { saveScan } from '../history.js'
 
 const step = ref('upload')
@@ -356,7 +356,11 @@ async function matchTracks() {
       track.status = result ? 'found' : 'not_found'
       track.match = result
       if (!result) track.included = false
-    } catch {
+    } catch (e) {
+      if (e instanceof SpotifyAuthError) {
+        playlistError.value = e.message
+        break
+      }
       track.status = 'not_found'
       track.included = false
     }
